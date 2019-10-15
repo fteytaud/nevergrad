@@ -31,11 +31,27 @@ class VarSpecs:
                 setattr(self, key, value)
 
 
+class VariableEvolution:
+
+    def __init__(self, variable: "Variable") -> None:
+        self._variable = variable
+
+    def sample(self) -> np.ndarray:
+        return np.random.normal(0, 1, self._variable.dimension)  # type: ignore
+
+    def mutation(self, array: np.ndarray) -> np.ndarray:  # pylint: disable=unused-argument
+        return np.random.normal(0, 1, self._variable.dimension)  # type: ignore
+
+    def recombination(self, arrays: List[np.ndarray]) -> np.ndarray:
+        return np.mean(arrays, axis=0)  # type: ignore
+
+
 class Variable:
 
     def __init__(self) -> None:
         self._random_state: Optional[np.random.RandomState] = None  # lazy initialization
         self._specs = VarSpecs()
+        self.evolution = VariableEvolution(self)
 
     @property
     def random_state(self) -> np.random.RandomState:

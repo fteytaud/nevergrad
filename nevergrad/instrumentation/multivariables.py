@@ -4,11 +4,29 @@
 # LICENSE file in the root directory of this source tree.
 
 import itertools
-from typing import List, Any, Tuple, Dict, Optional, Callable
+from typing import List, Any, Tuple, Dict, Optional, Callable, Union
 import numpy as np
 from ..common.typetools import ArrayLike
 from .variables import _Constant, wrap_arg
-from .core import Variable, ArgsKwargs
+from .core import Variable, ArgsKwargs, VariableEvolution
+
+
+class MultiVariableEvolution(VariableEvolution):
+
+    def sample(self) -> np.ndarray:
+        np.concatenate([var.sample() for var in self.variables], axis=0)
+
+    def mutation(self, array: np.ndarray) -> np.ndarray:  # pylint: disable=unused-argument
+        new_parts = []
+        for var, data_part in zip(self.variables.variables, self.variables._split_data(array)):
+            new_parts.append(self.mutation(data_part))
+        return np.concatenate(new_parts, axis=0)
+
+    def recombination(self, arrays: List[np.ndarray]) -> np.ndarray:
+        new_parts = []
+        for var, data_part in tip(self.variables.variables, self.variables._split_data(array)):
+            new_parts.append(getattr(var, name)(data_parts))
+        return np.concatenate(new_parts, axis=0)
 
 
 class NestedVariables(Variable):
@@ -29,6 +47,7 @@ class NestedVariables(Variable):
         self.keywords: Tuple[Optional[str], ...] = ()
         self.variables: List[Variable] = []
         self._set_args_kwargs(args, kwargs)
+        self.evolution = MultiVariableEvolution(self)
 
     @property
     def args(self) -> Tuple[Variable, ...]:
