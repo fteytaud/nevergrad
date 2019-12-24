@@ -144,7 +144,7 @@ def parallel(seed: Optional[int] = None) -> Iterator[Experiment]:
     # prepare list of parameters to sweep for independent variables
     seedg = create_seed_generator(seed)
     names = ["sphere", "rastrigin", "cigar"]
-    optims = ["ScrHammersleySearch", "FTNGO", "CMA", "PSO", "NaiveTBPSA", "OnePlusOne", "DE", "TwoPointsDE"]
+    optims = ["ScrHammersleySearch", "FTNGO", "Fabienosaur", "CMA", "PSO", "NaiveTBPSA", "OnePlusOne", "DE", "TwoPointsDE"]
     functions = [
         ArtificialFunction(name, block_dimension=bd, useless_variables=bd * uv_factor)
         for name in names
@@ -204,6 +204,30 @@ def multimodal(seed: Optional[int] = None) -> Iterator[Experiment]:
                 # duplicate -> each Experiment has different randomness
                 yield Experiment(func.duplicate(), optim, budget=budget, num_workers=1, seed=next(seedg))
 
+@registry.register
+def fabtest(seed: Optional[int] = None, parallel: bool = False, big: bool = False, noise: bool = False) -> Iterator[Experiment]:
+    """Just testing fabienosaur behavior on uni and multimodal functions.
+    """
+    seedg = create_seed_generator(seed)
+    optims = ["EMNA"]
+    #optims += [x for x, y in ng.optimizers.registry.items() if "chain" in x]
+    # names = ["hm", "rastrigin", "griewank"]
+    # names += ["sphere", "cigar", "ellipsoid"]
+    names = ["sphere"]
+    functions = [
+        ArtificialFunction(name, block_dimension=d, rotation=rotation, noise_level=100 if noise else 0) for name in names 
+        for rotation in [False]
+        for num_blocks in [1]
+        # for d in [2, 10, 50]
+        for d in [2]
+    ]
+    for optim in optims:
+        for function in functions:
+            for budget in [12800]:
+                xp = Experiment(function.duplicate(), optim, num_workers=100 if parallel else 1,
+                        budget=budget, seed=next(seedg))
+                if not xp.is_incoherent:
+                    yield xp
 
 @registry.register
 def yabbob(seed: Optional[int] = None, parallel: bool = False, big: bool = False, noise: bool = False) -> Iterator[Experiment]:
@@ -214,7 +238,7 @@ def yabbob(seed: Optional[int] = None, parallel: bool = False, big: bool = False
               "TwoPointsDE", "OnePointDE", "AlmostRotationInvariantDE", "RotationInvariantDE"]
     if not parallel:
         optims += ["SQP", "Cobyla", "Powell", "chainCMASQP"]
-    optims = ["NaiveTBPSA", "Fabienosaur", "DE"]
+    optims = ["NaiveTBPSA", "FTNGO", "DE"]
     #optims += [x for x, y in ng.optimizers.registry.items() if "chain" in x]
     names = ["hm", "rastrigin", "griewank", "rosenbrock", "ackley", "lunacek", "deceptivemultimodal", "bucherastrigin", "multipeak"]
     names += ["sphere", "doublelinearslope", "stepdoublelinearslope"]

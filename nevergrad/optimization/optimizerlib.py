@@ -1577,6 +1577,7 @@ class JNGO(NGO):
                             self.optims = [Powell(self.instrumentation, budget, num_workers)]  # noqa: F405
                         else:
                             self.optims = [chainCMAwithLHSsqrt(self.instrumentation, budget, num_workers)]  # noqa: F405
+import sys
 
 @base.registry.register
 class Fabienosaur(base.Optimizer):
@@ -1585,17 +1586,17 @@ class Fabienosaur(base.Optimizer):
     def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
         super().__init__(instrumentation, budget=budget, num_workers=num_workers)
         self.sigma = 1
-        self.mu = dimension
-        self.llambda = 4 * dimension
+        self.mu = self.dimension
+        self.llambda = 4 * self.dimension
         self.previousBest = None
         self.secondToLastBest = None
 
         if num_workers is not None:
             self.llambda = max(self.llambda, num_workers)
         self.largeenough = False
-        if num_workers/dimension > 8:
+        if num_workers/self.dimension > 8:
             self.largeenough = True
-        self.current_center = np.zeros(dimension)
+        self.current_center = np.zeros(self.dimension)
         # Evaluated population
         self.evaluated_population: List[base.ArrayLike] = []
         self.evaluated_population_sigma: List[float] = []
@@ -1646,19 +1647,69 @@ class Fabienosaur(base.Optimizer):
         del self.unevaluated_population_sigma[idx]
         if len(self.evaluated_population) >= self.llambda:
             # Sorting the population.
-            sorted_pop_with_sigma_and_fitness = [(i, s, f) for f, i, s in sorted(
-                zip(self.evaluated_population_fitness, self.evaluated_population, self.evaluated_population_sigma))]
+            sorted_pop_with_sigma_and_fitness = [
+                (i, s, f)
+                for f, i, s in sorted(zip(self.evaluated_population_fitness, self.evaluated_population, self.evaluated_population_sigma), key = lambda t: t[0])
+            ]
             self.evaluated_population = [p[0] for p in sorted_pop_with_sigma_and_fitness]
             self.evaluated_population_sigma = [p[1] for p in sorted_pop_with_sigma_and_fitness]
             self.evaluated_population_fitness = [p[2] for p in sorted_pop_with_sigma_and_fitness]
             # Computing the new parent.
             # EMNA update
             self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
+            print(sys.stderr,"AAAAA ", self.current_center)
             t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
             self.sigma = np.sqrt(sum(t1)/(self.mu))
             self.evaluated_population = []
             self.evaluated_population_sigma = []
             self.evaluated_population_fitness = []
+
+@base.registry.register
+class EMNA(EDA):
+    # pylint: disable=too-many-instance-attributes
+
+    def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
+        super().__init__(instrumentation, budget=budget, num_workers=num_workers)
+        self.mu = self.dimension
+        self.llambda = 4 * self.dimension
+        self.previousBest = None
+        self.secondToLastBest = None
+        self.current_fitness = None
+
+    def _internal_tell(self, x: base.ArrayLike, value: float) -> None:
+        self.archive_fitness += [value]
+        idx = self.unevaluated_population.index(tuple(x))
+        self.evaluated_population += [x]
+        self.evaluated_population_fitness += [value]
+        self.evaluated_population_sigma += [self.unevaluated_population_sigma[idx]]
+        del self.unevaluated_population[idx]
+        del self.unevaluated_population_sigma[idx]
+        if len(self.evaluated_population) >= self.llambda:
+            # Sorting the population.
+            sorted_pop_with_sigma_and_fitness = [
+                (i, s, f)
+                for f, i, s in sorted(zip(self.evaluated_population_fitness, self.evaluated_population, self.evaluated_population_sigma), key = lambda t: t[0])
+            ]
+            self.evaluated_population = [p[0] for p in sorted_pop_with_sigma_and_fitness]
+            self.evaluated_population_sigma = [p[1] for p in sorted_pop_with_sigma_and_fitness]
+            self.evaluated_population_fitness = [p[2] for p in sorted_pop_with_sigma_and_fitness]
+            # Computing the new parent.
+            # EMNA update
+            self.secondToLastBest = self.previousBest
+            self.previousBest = self.current_fitness
+            self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
+            self.current_fitness = sum([np.asarray(self.evaluated_population_fitness[i]) for i in range(self.mu)]) / self.mu
+            print(sys.stderr,"AAAAA ", self.secondToLastBest, " ", self.previousBest, " ", self.current_fitness, self.current_center)
+            t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
+            self.sigma = np.sqrt(sum(t1)/(self.mu))
+            self.evaluated_population = []
+            self.evaluated_population_sigma = []
+            self.evaluated_population_fitness = []
+
+    def _internal_provide_recommendation(self) -> base.ArrayLike:
+        return self.current_center
+        # return self.current_bests["optimistic"].x
+
 
 
 @registry.register
