@@ -1684,6 +1684,10 @@ class EMNA(EDA):
         self.evaluated_population_sigma += [self.unevaluated_population_sigma[idx]]
         del self.unevaluated_population[idx]
         del self.unevaluated_population_sigma[idx]
+        print(sys.stderr,"CCCCC ", self.evaluated_population[0], " ", self.evaluated_population_fitness[0])
+        print(sys.stderr,"DDDDD ", self.evaluated_population_fitness)
+        print(sys.stderr,"EEEEE ", self.evaluated_population)
+        print(sys.stderr,"FFFFF ", self.evaluated_population_sigma)
         if len(self.evaluated_population) >= self.llambda:
             # Sorting the population.
             sorted_pop_with_sigma_and_fitness = [
@@ -1697,9 +1701,10 @@ class EMNA(EDA):
             # EMNA update
             self.secondToLastBest = self.previousBest
             self.previousBest = self.current_fitness
-            self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
             self.current_fitness = sum([np.asarray(self.evaluated_population_fitness[i]) for i in range(self.mu)]) / self.mu
+            self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
             print(sys.stderr,"AAAAA ", self.secondToLastBest, " ", self.previousBest, " ", self.current_fitness, self.current_center)
+            print(sys.stderr,"BBBBB ", self.evaluated_population[0], " ", self.evaluated_population_fitness[0])
             t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
             self.sigma = np.sqrt(sum(t1)/(self.mu))
             self.evaluated_population = []
