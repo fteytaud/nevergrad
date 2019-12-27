@@ -1590,6 +1590,7 @@ class Fabienosaur(base.Optimizer):
         self.llambda = 4 * self.dimension
         self.previousBest = None
         self.secondToLastBest = None
+        self.current_fitness = None
 
         if num_workers is not None:
             self.llambda = max(self.llambda, num_workers)
@@ -1656,8 +1657,11 @@ class Fabienosaur(base.Optimizer):
             self.evaluated_population_fitness = [p[2] for p in sorted_pop_with_sigma_and_fitness]
             # Computing the new parent.
             # EMNA update
+            self.secondToLastBest = self.previousBest
+            self.previousBest = self.current_fitness
+            self.current_fitness = sum([np.asarray(self.evaluated_population_fitness[i]) for i in range(self.mu)]) / self.mu
             self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
-            print(sys.stderr,"AAAAA ", self.current_center)
+            print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0])
             t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
             self.sigma = np.sqrt(sum(t1)/(self.mu))
             self.evaluated_population = []
@@ -1676,6 +1680,14 @@ class EMNA(EDA):
         self.secondToLastBest = None
         self.current_fitness = None
 
+    def _internal_ask(self) -> ArrayLike:
+        mutated_sigma = self.sigma * np.exp(self._rng.normal(0, 1) / np.sqrt(self.dimension))
+        assert len(self.current_center) == len(self.covariance), [self.dimension, self.current_center, self.covariance]
+        individual = tuple(mutated_sigma * self._rng.multivariate_normal(self.current_center, self.covariance))
+        self.unevaluated_population_sigma += [mutated_sigma]
+        self.unevaluated_population += [tuple(individual)]
+        return individual
+
     def _internal_tell(self, x: base.ArrayLike, value: float) -> None:
         self.archive_fitness += [value]
         idx = self.unevaluated_population.index(tuple(x))
@@ -1684,10 +1696,6 @@ class EMNA(EDA):
         self.evaluated_population_sigma += [self.unevaluated_population_sigma[idx]]
         del self.unevaluated_population[idx]
         del self.unevaluated_population_sigma[idx]
-        print(sys.stderr,"CCCCC ", self.evaluated_population[0], " ", self.evaluated_population_fitness[0])
-        print(sys.stderr,"DDDDD ", self.evaluated_population_fitness)
-        print(sys.stderr,"EEEEE ", self.evaluated_population)
-        print(sys.stderr,"FFFFF ", self.evaluated_population_sigma)
         if len(self.evaluated_population) >= self.llambda:
             # Sorting the population.
             sorted_pop_with_sigma_and_fitness = [
@@ -1703,8 +1711,7 @@ class EMNA(EDA):
             self.previousBest = self.current_fitness
             self.current_fitness = sum([np.asarray(self.evaluated_population_fitness[i]) for i in range(self.mu)]) / self.mu
             self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
-            print(sys.stderr,"AAAAA ", self.secondToLastBest, " ", self.previousBest, " ", self.current_fitness, self.current_center)
-            print(sys.stderr,"BBBBB ", self.evaluated_population[0], " ", self.evaluated_population_fitness[0])
+            print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0])
             t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
             self.sigma = np.sqrt(sum(t1)/(self.mu))
             self.evaluated_population = []

@@ -210,6 +210,7 @@ def fabtest(seed: Optional[int] = None, parallel: bool = False, big: bool = Fals
     """
     seedg = create_seed_generator(seed)
     optims = ["EMNA"]
+    # optims = ["Fabienosaur"]
     #optims += [x for x, y in ng.optimizers.registry.items() if "chain" in x]
     # names = ["hm", "rastrigin", "griewank"]
     # names += ["sphere", "cigar", "ellipsoid"]
