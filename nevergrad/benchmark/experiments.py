@@ -34,7 +34,7 @@ def discrete2(seed: Optional[int] = None) -> Iterator[Experiment]:
     seedg = create_seed_generator(seed)
     names = [n for n in ArtificialFunction.list_sorted_function_names()
              if ("one" in n or "jump" in n) and ("5" not in n) and ("hard" in n)]
-    optims = ["FTNGO"] + sorted(
+    optims = ["NGO", "CMA"] + sorted(
         x for x, y in ng.optimizers.registry.items() if "andomSearch" in x or "PBIL" in x or "cGA" in x or
         ("iscrete" in x and "epea" not in x and "DE" not in x and "SSNEA" not in x)
     )
@@ -58,7 +58,7 @@ def discrete(seed: Optional[int] = None) -> Iterator[Experiment]:
     # Discrete test bed, including useless variables, 5 values or 2 values per character.
     seedg = create_seed_generator(seed)
     names = [n for n in ArtificialFunction.list_sorted_function_names() if "one" in n or "jump" in n]
-    optims = ["NGO"] + sorted(
+    optims = ["NGO", "CMA"] + sorted(
         x for x, y in ng.optimizers.registry.items()
         if "andomSearch" in x or ("iscrete" in x and "epea" not in x and "DE" not in x and "SSNEA" not in x)
     )
@@ -231,7 +231,7 @@ def fabtest(seed: Optional[int] = None, parallel: bool = False, big: bool = Fals
                     yield xp
 
 @registry.register
-def yabbob(seed: Optional[int] = None, parallel: bool = False, big: bool = False, noise: bool = False) -> Iterator[Experiment]:
+def yabbob(seed: Optional[int] = None, parallel: bool = False, big: bool = False, noise: bool = False, hd: bool = False) -> Iterator[Experiment]:
     """Yet Another Black-Box Optimization Benchmark.
     """
     seedg = create_seed_generator(seed)
@@ -252,7 +252,7 @@ def yabbob(seed: Optional[int] = None, parallel: bool = False, big: bool = False
         ArtificialFunction(name, block_dimension=d, rotation=rotation, noise_level=100 if noise else 0) for name in names 
         for rotation in [True, False]
         for num_blocks in [1]
-        for d in [2, 10, 50]
+        for d in ([100, 1000, 3000] if hd else [2, 10, 50])
     ]
     for optim in optims:
         for function in functions:
@@ -265,6 +265,13 @@ def yabbob(seed: Optional[int] = None, parallel: bool = False, big: bool = False
 @registry.register
 def yabigbbob(seed: Optional[int] = None) -> Iterator[Experiment]:
     internal_generator = yabbob(seed, parallel=False, big=True)
+    for xp in internal_generator:
+        yield xp
+
+
+@registry.register
+def yahdbbob(seed: Optional[int] = None) -> Iterator[Experiment]:
+    internal_generator = yabbob(seed, hd=True)
     for xp in internal_generator:
         yield xp
 
