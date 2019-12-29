@@ -1597,6 +1597,7 @@ class Fabienosaur(base.Optimizer):
     def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
         super().__init__(instrumentation, budget=budget, num_workers=num_workers)
         self.sigma = 1
+        # self.sigma = np.ones(self.dimension)
         self.mu = self.dimension
         self.llambda = 4 * self.dimension
         self.previousBest = None
@@ -1675,6 +1676,10 @@ class Fabienosaur(base.Optimizer):
             # print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0], ", ", self.current_center, ", ", self.evaluated_population[0])
             t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
             self.sigma = np.sqrt(sum(t1)/(self.mu))
+            imp = max(1, (np.log(self.llambda)/2)**(1/self.dimension))
+            if self.num_workers/self.dimension > 16:
+                # if self.largeenough:
+                self.sigma /= imp
             self.evaluated_population = []
             self.evaluated_population_sigma = []
             self.evaluated_population_fitness = []
@@ -1750,31 +1755,37 @@ class FTNGO(NGO):
         self.has_discrete_not_softmax = "rderedDiscr" in str(self.instrumentation.variables)
         if self.has_noise and self.has_discrete_not_softmax:
             # noise and discrete: let us merge evolution and bandits.
-            self.optims = [DoubleFastGAOptimisticNoisyDiscreteOnePlusOne(self.instrumentation, budget, num_workers)] 
+            self.optims = [DoubleFastGAOptimisticNoisyDiscreteOnePlusOne(self.instrumentation, budget, num_workers)]
         else:
             if self.has_noise and self.fully_continuous:
                 # This is the real of population control. FIXME: should we pair with a bandit ?
                 self.optims = [TBPSA(self.instrumentation, budget, num_workers)]
             else:
                 if self.has_discrete_not_softmax or self.instrumentation.is_nonmetrizable or not self.fully_continuous:
-                    self.optims = [DoubleFastGADiscreteOnePlusOne(self.instrumentation, budget, num_workers)] 
+                    self.optims = [DoubleFastGADiscreteOnePlusOne(self.instrumentation, budget, num_workers)]
                 else:
-                    if num_workers > budget / 10:  # type: ignore
-                        self.optims = [Fabienosaur(self.instrumentation, budget, num_workers)]  # noqa: F405
-                    else:
-                        if num_workers > budget / 5:
-                            if num_workers > budget / 2. or budget < self.dimension:
-                                self.optims = [MetaRecentering(self.instrumentation, budget, num_workers)]  # noqa: F405
+                    if num_workers > budget / 10:
+                        if budget < self.dimension:
+                            self.optims = [MetaRecentering(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        else:
+                            if num_workers > self.dimension / 4:
+                                self.optims = [Fabienosaur(self.instrumentation, budget, num_workers)]  # noqa: F405
                             else:
                                 self.optims = [NaiveTBPSA(self.instrumentation, budget, num_workers)]  # noqa: F405
-                        else:
-                            if num_workers == 1 and budget > 6000:  # Let us go memetic.
-                                self.optims = [chainCMASQP(self.instrumentation, budget, num_workers)]  # noqa: F405
+                    else:
+                        # Possibly a good idea to go memetic for large budget, but something goes wrong for the moment.
+                        # if num_workers == 1 and budget > 6000:  # Let us go memetic.
+                        #    self.optims = [chainCMASQP(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        # else
+                        if num_workers == 1 and budget < self.dimension * 30:
+                            if self.dimension > 30:  # One plus one so good in large ratio "dimension / budget".
+                                self.optims = [OnePlusOne(self.instrumentation, budget, num_workers)]  # noqa: F405
                             else:
-                                if self.dimension > 2000:  # DE is great in such a case.
-                                    self.optims = [DE(self.instrumentation, budget, num_workers)]  # noqa: F405
-                                else:
-                                    self.optims = [CMA(self.instrumentation, budget, num_workers)]  # noqa: F405        
-
+                                self.optims = [Cobyla(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        else:
+                            if self.dimension > 2000:  # DE is great in such a case (?).
+                                self.optims = [DE(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [CMA(self.instrumentation, budget, num_workers)]  # noqa: F405
 
 __all__ = list(registry.keys())
