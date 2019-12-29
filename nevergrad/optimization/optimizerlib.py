@@ -1672,7 +1672,7 @@ class Fabienosaur(base.Optimizer):
             self.previousBest = self.current_fitness
             self.current_fitness = sum([np.asarray(self.evaluated_population_fitness[i]) for i in range(self.mu)]) / self.mu
             self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
-            print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0], ", ", self.current_center, ", ", self.evaluated_population[0])
+            # print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0], ", ", self.current_center, ", ", self.evaluated_population[0])
             t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
             self.sigma = np.sqrt(sum(t1)/(self.mu))
             self.evaluated_population = []
@@ -1722,7 +1722,7 @@ class EMNA(EDA):
             self.previousBest = self.current_fitness
             self.current_fitness = sum([np.asarray(self.evaluated_population_fitness[i]) for i in range(self.mu)]) / self.mu
             self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
-            print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0], ", ", self.current_center, ", ", self.evaluated_population[0])
+            # print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0], ", ", self.current_center, ", ", self.evaluated_population[0])
             t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
             self.sigma = np.sqrt(sum(t1)/(self.mu))
             self.evaluated_population = []

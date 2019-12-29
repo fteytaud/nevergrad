@@ -214,7 +214,7 @@ def fabtest(seed: Optional[int] = None, parallel: bool = False, big: bool = Fals
     #optims += [x for x, y in ng.optimizers.registry.items() if "chain" in x]
     # names = ["hm", "rastrigin", "griewank"]
     # names += ["sphere", "cigar", "ellipsoid"]
-    names = ["sphere"]
+    names = ["rastrigin"]
     functions = [
         ArtificialFunction(name, block_dimension=d, rotation=rotation, noise_level=100 if noise else 0) for name in names 
         for rotation in [False]
@@ -239,7 +239,7 @@ def yabbob(seed: Optional[int] = None, parallel: bool = False, big: bool = False
               "TwoPointsDE", "OnePointDE", "AlmostRotationInvariantDE", "RotationInvariantDE"]
     if not parallel:
         optims += ["SQP", "Cobyla", "Powell", "chainCMASQP"]
-    optims = ["NaiveTBPSA", "FTNGO", "DE"]
+    optims = ["NaiveTBPSA", "EMNA", "DE"]
     #optims += [x for x, y in ng.optimizers.registry.items() if "chain" in x]
     names = ["hm", "rastrigin", "griewank", "rosenbrock", "ackley", "lunacek", "deceptivemultimodal", "bucherastrigin", "multipeak"]
     names += ["sphere", "doublelinearslope", "stepdoublelinearslope"]
