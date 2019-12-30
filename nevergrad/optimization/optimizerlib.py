@@ -1588,7 +1588,6 @@ class JNGO(NGO):
                             self.optims = [Powell(self.instrumentation, budget, num_workers)]  # noqa: F405
                         else:
                             self.optims = [chainCMAwithLHSsqrt(self.instrumentation, budget, num_workers)]  # noqa: F405
-import sys
 
 @base.registry.register
 class Fabienosaur(base.Optimizer):
@@ -1685,21 +1684,132 @@ class Fabienosaur(base.Optimizer):
             self.evaluated_population_fitness = []
 
 @base.registry.register
-class EMNA(EDA):
+class IFabienosaur(Fabienosaur):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
         super().__init__(instrumentation, budget=budget, num_workers=num_workers)
+        self.sigma = 1
+        # self.sigma = np.ones(self.dimension)
+        self.mu = self.dimension
+        self.llambda = 4 * self.dimension
+        self.gofast = False
+
+        if num_workers is not None:
+            self.llambda = max(self.llambda, num_workers)
+        self.largeenough = False
+        if num_workers/self.dimension > 8:
+            self.largeenough = True
+        self.current_center = np.zeros(self.dimension)
+        # Evaluated population
+        self.evaluated_population: List[base.ArrayLike] = []
+        self.evaluated_population_sigma: List[float] = []
+        self.evaluated_population_fitness: List[float] = []
+        # Unevaluated population
+        self.unevaluated_population: List[base.ArrayLike] = []
+        self.unevaluated_population_sigma: List[float] = []
+        # Archive
+        self.archive_fitness: List[float] = []
+
+    def _internal_ask(self) -> base.ArrayLike:
+        mutated_sigma = self.sigma * np.exp(np.random.normal(0, 1) / np.sqrt(self.dimension))
+        individual = tuple(self.current_center + mutated_sigma * np.random.normal(0, 1, self.dimension))
+        self.unevaluated_population_sigma += [mutated_sigma]
+        self.unevaluated_population += [tuple(individual)]
+        return individual
+
+    def _internal_tell(self, x: base.ArrayLike, value: float) -> None:
+        self.archive_fitness += [value]
+        if (not self.largeenough):
+            if len(self.archive_fitness) >= 5 * self.llambda:
+                first_fifth = [self.archive_fitness[i] for i in range(self.llambda)]
+                last_fifth = [self.archive_fitness[i] for i in range(4*self.llambda, 5*self.llambda)]
+                mean1 = sum(first_fifth) / float(self.llambda)
+                std1 = np.std(first_fifth) / np.sqrt(self.llambda - 1)
+                mean2 = sum(last_fifth) / float(self.llambda)
+                std2 = np.std(last_fifth) / np.sqrt(self.llambda - 1)
+                z = (mean1 - mean2) / (np.sqrt(std1**2 + std2**2))
+                if z < 2.:
+                    self.mu *= 2
+                    self.gofast = True
+                else:
+                    self.gofast = False
+                    self.mu = int(self.mu * 0.84)
+                    if self.mu < self.dimension:
+                        self.mu = self.dimension
+                self.llambda = 4 * self.mu
+                if self.num_workers > 1:
+                    self.llambda = max(self.llambda, self.num_workers)
+                    self.mu = self.llambda // 4
+                self.archive_fitness = []
+        idx = self.unevaluated_population.index(tuple(x))
+        self.evaluated_population += [x]
+        self.evaluated_population_fitness += [value]
+        self.evaluated_population_sigma += [self.unevaluated_population_sigma[idx]]
+        del self.unevaluated_population[idx]
+        del self.unevaluated_population_sigma[idx]
+        if len(self.evaluated_population) >= self.llambda:
+            # Sorting the population.
+            sorted_pop_with_sigma_and_fitness = [
+                (i, s, f)
+                for f, i, s in sorted(zip(self.evaluated_population_fitness, self.evaluated_population, self.evaluated_population_sigma), key = lambda t: t[0])
+            ]
+            self.evaluated_population = [p[0] for p in sorted_pop_with_sigma_and_fitness]
+            self.evaluated_population_sigma = [p[1] for p in sorted_pop_with_sigma_and_fitness]
+            self.evaluated_population_fitness = [p[2] for p in sorted_pop_with_sigma_and_fitness]
+            # Computing the new parent.
+            # EMNA update
+            self.secondToLastBest = self.previousBest
+            self.previousBest = self.current_fitness
+            self.current_fitness = sum([np.asarray(self.evaluated_population_fitness[i]) for i in range(self.mu)]) / self.mu
+            self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
+            # print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0], ", ", self.current_center, ", ", self.evaluated_population[0])
+            t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
+            self.sigma = np.sqrt(sum(t1)/(self.mu))
+            imp = max(1, (np.log(self.llambda)/2)**(1/self.dimension))
+            if self.num_workers/self.dimension > 16:
+                # if self.largeenough:
+                self.sigma /= imp
+            self.evaluated_population = []
+            self.evaluated_population_sigma = []
+            self.evaluated_population_fitness = []
+
+@base.registry.register
+class EMNA(base.Optimizer):
+    # pylint: disable=too-many-instance-attributes
+
+    def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
+        super().__init__(instrumentation, budget=budget, num_workers=num_workers)
+        self.sigma = 1
+        # self.sigma = np.ones(self.dimension)
         self.mu = self.dimension
         self.llambda = 4 * self.dimension
         self.previousBest = None
         self.secondToLastBest = None
         self.current_fitness = None
 
-    def _internal_ask(self) -> ArrayLike:
-        mutated_sigma = self.sigma * np.exp(self._rng.normal(0, 1) / np.sqrt(self.dimension))
-        assert len(self.current_center) == len(self.covariance), [self.dimension, self.current_center, self.covariance]
-        individual = tuple(mutated_sigma * self._rng.multivariate_normal(self.current_center, self.covariance))
+        if num_workers is not None:
+            self.llambda = max(self.llambda, num_workers)
+        self.largeenough = False
+        if num_workers/self.dimension > 8:
+            self.largeenough = True
+        self.current_center = np.zeros(self.dimension)
+        # Evaluated population
+        self.evaluated_population: List[base.ArrayLike] = []
+        self.evaluated_population_sigma: List[float] = []
+        self.evaluated_population_fitness: List[float] = []
+        # Unevaluated population
+        self.unevaluated_population: List[base.ArrayLike] = []
+        self.unevaluated_population_sigma: List[float] = []
+        # Archive
+        self.archive_fitness: List[float] = []
+
+    def _internal_provide_recommendation(self) -> base.ArrayLike:
+        return self.current_bests["optimistic"].x
+
+    def _internal_ask(self) -> base.ArrayLike:
+        mutated_sigma = self.sigma * np.exp(np.random.normal(0, 1) / np.sqrt(self.dimension))
+        individual = tuple(self.current_center + mutated_sigma * np.random.normal(0, 1, self.dimension))
         self.unevaluated_population_sigma += [mutated_sigma]
         self.unevaluated_population += [tuple(individual)]
         return individual
@@ -1727,21 +1837,190 @@ class EMNA(EDA):
             self.previousBest = self.current_fitness
             self.current_fitness = sum([np.asarray(self.evaluated_population_fitness[i]) for i in range(self.mu)]) / self.mu
             self.current_center = sum([np.asarray(self.evaluated_population[i]) for i in range(self.mu)]) / self.mu
-            # print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0], ", ", self.current_center, ", ", self.evaluated_population[0])
             t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
             self.sigma = np.sqrt(sum(t1)/(self.mu))
+            imp = max(1, (np.log(self.llambda)/2)**(1/self.dimension))
+            if self.num_workers/self.dimension > 16:
+                self.sigma /= imp
             self.evaluated_population = []
             self.evaluated_population_sigma = []
             self.evaluated_population_fitness = []
 
-    def _internal_provide_recommendation(self) -> base.ArrayLike:
-        return self.current_center
-        # return self.current_bests["optimistic"].x
+@base.registry.register
+class IEMNA(base.Optimizer):
+    # pylint: disable=too-many-instance-attributes
 
+    def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
+        super().__init__(instrumentation, budget=budget, num_workers=num_workers)
+        self.sigma = 1
+        # self.sigma = np.ones(self.dimension)
+        self.mu = self.dimension
+        self.llambda = 4 * self.dimension
+        self.ds = 1.
+        self.dmu = np.ones(self.dimension, dtype=float)
+
+        if num_workers is not None:
+            self.llambda = max(self.llambda, num_workers)
+        self.largeenough = False
+        if num_workers/self.dimension > 8:
+            self.largeenough = True
+        self.current_center = np.zeros(self.dimension)
+        # Evaluated population
+        self.evaluated_population: List[base.ArrayLike] = []
+        self.evaluated_population_sigma: List[float] = []
+        self.evaluated_population_fitness: List[float] = []
+        # Unevaluated population
+        self.unevaluated_population: List[base.ArrayLike] = []
+        self.unevaluated_population_sigma: List[float] = []
+        # Archive
+        self.archive_fitness: List[float] = []
+
+    def _internal_provide_recommendation(self) -> base.ArrayLike:
+        return self.current_bests["optimistic"].x
+
+    def _internal_ask(self) -> base.ArrayLike:
+        mutated_sigma = self.sigma * np.exp(np.random.normal(0, 1) / np.sqrt(self.dimension))
+        individual = tuple(self.current_center + mutated_sigma * np.random.normal(0, 1, self.dimension))
+        self.ds = mutated_sigma
+        self.dmu = self.current_center
+        self.unevaluated_population_sigma += [mutated_sigma]
+        self.unevaluated_population += [tuple(individual)]
+        return individual
+
+    def _internal_tell(self, x: base.ArrayLike, value: float) -> None:
+        self.archive_fitness += [value]
+        idx = self.unevaluated_population.index(tuple(x))
+        self.evaluated_population += [x]
+        self.evaluated_population_fitness += [value]
+        self.evaluated_population_sigma += [self.unevaluated_population_sigma[idx]]
+        del self.unevaluated_population[idx]
+        del self.unevaluated_population_sigma[idx]
+        if len(self.evaluated_population) >= self.llambda:
+            # Sorting the population.
+            sorted_pop_with_sigma_and_fitness = [
+                (i, s, f)
+                for f, i, s in sorted(zip(self.evaluated_population_fitness, self.evaluated_population, self.evaluated_population_sigma), key = lambda t: t[0])
+            ]
+            self.evaluated_population = [p[0] for p in sorted_pop_with_sigma_and_fitness]
+            self.evaluated_population_sigma = [p[1] for p in sorted_pop_with_sigma_and_fitness]
+            self.evaluated_population_fitness = [p[2] for p in sorted_pop_with_sigma_and_fitness]
+            # Computing the new parent.
+            
+            # reweithing
+            tmp = [np.asarray(self.evaluated_population[i]) for i in range(self.mu)]
+            density = 1./(self.ds*np.sqrt(2.*np.pi))*np.exp((tmp-self.dmu)/(2.*self.ds*self.ds))
+            density /= sum(density)
+
+            # EMNA update
+            self.current_center = sum(density*tmp) / self.mu
+            t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
+            self.sigma = np.sqrt(sum(t1)/(self.mu))
+            imp = max(1, (np.log(self.llambda)/2)**(1/self.dimension))
+            if self.num_workers/self.dimension > 16:
+                self.sigma /= imp
+            self.evaluated_population = []
+            self.evaluated_population_sigma = []
+            self.evaluated_population_fitness = []
 
 
 @registry.register
-class FTNGO(NGO):
+class FT_EMNA_NGO(NGO):
+    """Nevergrad optimizer by competence map. You might modify this one for designing youe own competence map."""
+
+    def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
+        super().__init__(instrumentation, budget=budget, num_workers=num_workers)
+        assert budget is not None
+        self.who_asked: Dict[Tuple[float, ...], List[int]] = defaultdict(list)
+        self.has_noise = self.instrumentation.noisy
+        if self.instrumentation.probably_noisy:
+            self.has_noise = True
+        self.fully_continuous = self.instrumentation.continuous
+        self.has_discrete_not_softmax = "rderedDiscr" in str(self.instrumentation.variables)
+        if self.has_noise and self.has_discrete_not_softmax:
+            # noise and discrete: let us merge evolution and bandits.
+            self.optims = [DoubleFastGAOptimisticNoisyDiscreteOnePlusOne(self.instrumentation, budget, num_workers)]
+        else:
+            if self.has_noise and self.fully_continuous:
+                # This is the real of population control. FIXME: should we pair with a bandit ?
+                self.optims = [TBPSA(self.instrumentation, budget, num_workers)]
+            else:
+                if self.has_discrete_not_softmax or self.instrumentation.is_nonmetrizable or not self.fully_continuous:
+                    self.optims = [DoubleFastGADiscreteOnePlusOne(self.instrumentation, budget, num_workers)]
+                else:
+                    if num_workers > budget / 10:
+                        if budget < self.dimension:
+                            self.optims = [MetaRecentering(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        else:
+                            if num_workers > self.dimension / 4:
+                                self.optims = [EMNA(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [NaiveTBPSA(self.instrumentation, budget, num_workers)]  # noqa: F405
+                    else:
+                        # Possibly a good idea to go memetic for large budget, but something goes wrong for the moment.
+                        # if num_workers == 1 and budget > 6000:  # Let us go memetic.
+                        #    self.optims = [chainCMASQP(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        # else
+                        if num_workers == 1 and budget < self.dimension * 30:
+                            if self.dimension > 30:  # One plus one so good in large ratio "dimension / budget".
+                                self.optims = [OnePlusOne(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [Cobyla(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        else:
+                            if self.dimension > 2000:  # DE is great in such a case (?).
+                                self.optims = [DE(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [CMA(self.instrumentation, budget, num_workers)]  # noqa: F405
+
+@registry.register
+class FT_IEMNA_NGO(NGO):
+    """Nevergrad optimizer by competence map. You might modify this one for designing youe own competence map."""
+
+    def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
+        super().__init__(instrumentation, budget=budget, num_workers=num_workers)
+        assert budget is not None
+        self.who_asked: Dict[Tuple[float, ...], List[int]] = defaultdict(list)
+        self.has_noise = self.instrumentation.noisy
+        if self.instrumentation.probably_noisy:
+            self.has_noise = True
+        self.fully_continuous = self.instrumentation.continuous
+        self.has_discrete_not_softmax = "rderedDiscr" in str(self.instrumentation.variables)
+        if self.has_noise and self.has_discrete_not_softmax:
+            # noise and discrete: let us merge evolution and bandits.
+            self.optims = [DoubleFastGAOptimisticNoisyDiscreteOnePlusOne(self.instrumentation, budget, num_workers)]
+        else:
+            if self.has_noise and self.fully_continuous:
+                # This is the real of population control. FIXME: should we pair with a bandit ?
+                self.optims = [TBPSA(self.instrumentation, budget, num_workers)]
+            else:
+                if self.has_discrete_not_softmax or self.instrumentation.is_nonmetrizable or not self.fully_continuous:
+                    self.optims = [DoubleFastGADiscreteOnePlusOne(self.instrumentation, budget, num_workers)]
+                else:
+                    if num_workers > budget / 10:
+                        if budget < self.dimension:
+                            self.optims = [MetaRecentering(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        else:
+                            if num_workers > self.dimension / 4:
+                                self.optims = [IEMNA(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [NaiveTBPSA(self.instrumentation, budget, num_workers)]  # noqa: F405
+                    else:
+                        # Possibly a good idea to go memetic for large budget, but something goes wrong for the moment.
+                        # if num_workers == 1 and budget > 6000:  # Let us go memetic.
+                        #    self.optims = [chainCMASQP(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        # else
+                        if num_workers == 1 and budget < self.dimension * 30:
+                            if self.dimension > 30:  # One plus one so good in large ratio "dimension / budget".
+                                self.optims = [OnePlusOne(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [Cobyla(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        else:
+                            if self.dimension > 2000:  # DE is great in such a case (?).
+                                self.optims = [DE(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [CMA(self.instrumentation, budget, num_workers)]  # noqa: F405
+
+@registry.register
+class FT_Fabienosaur_NGO(NGO):
     """Nevergrad optimizer by competence map. You might modify this one for designing youe own competence map."""
 
     def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
@@ -1787,5 +2066,59 @@ class FTNGO(NGO):
                                 self.optims = [DE(self.instrumentation, budget, num_workers)]  # noqa: F405
                             else:
                                 self.optims = [CMA(self.instrumentation, budget, num_workers)]  # noqa: F405
+
+@registry.register
+class FT_IFabienosaur_NGO(NGO):
+    """Nevergrad optimizer by competence map. You might modify this one for designing youe own competence map."""
+
+    def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
+        super().__init__(instrumentation, budget=budget, num_workers=num_workers)
+        assert budget is not None
+        self.who_asked: Dict[Tuple[float, ...], List[int]] = defaultdict(list)
+        self.has_noise = self.instrumentation.noisy
+        if self.instrumentation.probably_noisy:
+            self.has_noise = True
+        self.fully_continuous = self.instrumentation.continuous
+        self.has_discrete_not_softmax = "rderedDiscr" in str(self.instrumentation.variables)
+        if self.has_noise and self.has_discrete_not_softmax:
+            # noise and discrete: let us merge evolution and bandits.
+            self.optims = [DoubleFastGAOptimisticNoisyDiscreteOnePlusOne(self.instrumentation, budget, num_workers)]
+        else:
+            if self.has_noise and self.fully_continuous:
+                # This is the real of population control. FIXME: should we pair with a bandit ?
+                self.optims = [TBPSA(self.instrumentation, budget, num_workers)]
+            else:
+                if self.has_discrete_not_softmax or self.instrumentation.is_nonmetrizable or not self.fully_continuous:
+                    self.optims = [DoubleFastGADiscreteOnePlusOne(self.instrumentation, budget, num_workers)]
+                else:
+                    if num_workers > budget / 10:
+                        if budget < self.dimension:
+                            self.optims = [MetaRecentering(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        else:
+                            if num_workers > self.dimension / 4:
+                                self.optims = [Fabienosaur(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [NaiveTBPSA(self.instrumentation, budget, num_workers)]  # noqa: F405
+                    else:
+                        # Possibly a good idea to go memetic for large budget, but something goes wrong for the moment.
+                        # if num_workers == 1 and budget > 6000:  # Let us go memetic.
+                        #    self.optims = [chainCMASQP(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        # else
+                        if num_workers == 1 and budget < self.dimension * 30:
+                            if self.dimension > 30:  # One plus one so good in large ratio "dimension / budget".
+                                self.optims = [OnePlusOne(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [Cobyla(self.instrumentation, budget, num_workers)]  # noqa: F405
+                        else:
+                            if self.dimension > 2000:  # DE is great in such a case (?).
+                                self.optims = [DE(self.instrumentation, budget, num_workers)]  # noqa: F405
+                            else:
+                                self.optims = [CMA(self.instrumentation, budget, num_workers)]  # noqa: F405
+
+
+
+
+
+
 
 __all__ = list(registry.keys())
