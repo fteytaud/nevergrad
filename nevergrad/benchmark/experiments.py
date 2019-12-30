@@ -205,32 +205,6 @@ def multimodal(seed: Optional[int] = None) -> Iterator[Experiment]:
                 yield Experiment(func.duplicate(), optim, budget=budget, num_workers=1, seed=next(seedg))
 
 @registry.register
-def fabtest(seed: Optional[int] = None, parallel: bool = False, big: bool = False, noise: bool = False) -> Iterator[Experiment]:
-    """Just testing fabienosaur behavior on uni and multimodal functions.
-    """
-    seedg = create_seed_generator(seed)
-    optims = ["EMNA"]
-    # optims = ["Fabienosaur"]
-    #optims += [x for x, y in ng.optimizers.registry.items() if "chain" in x]
-    # names = ["hm", "rastrigin", "griewank"]
-    # names += ["sphere", "cigar", "ellipsoid"]
-    names = ["rastrigin"]
-    functions = [
-        ArtificialFunction(name, block_dimension=d, rotation=rotation, noise_level=100 if noise else 0) for name in names 
-        for rotation in [False]
-        for num_blocks in [1]
-        # for d in [2, 10, 50]
-        for d in [2]
-    ]
-    for optim in optims:
-        for function in functions:
-            for budget in [12800]:
-                xp = Experiment(function.duplicate(), optim, num_workers=100 if parallel else 1,
-                        budget=budget, seed=next(seedg))
-                if not xp.is_incoherent:
-                    yield xp
-
-@registry.register
 def yabbob(seed: Optional[int] = None, parallel: bool = False, big: bool = False, noise: bool = False, hd: bool = False) -> Iterator[Experiment]:
     """Yet Another Black-Box Optimization Benchmark.
     """
