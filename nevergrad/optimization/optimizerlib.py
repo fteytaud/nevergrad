@@ -1908,7 +1908,7 @@ class IEMNA(base.Optimizer):
             
             # reweithing
             tmp = [np.asarray(self.evaluated_population[i]) for i in range(self.mu)]
-            density = 1./(self.ds*np.sqrt(2.*np.pi))*np.exp((tmp-self.dmu)/(2.*self.ds*self.ds))
+            density = 1./(self.ds*np.sqrt(2.*np.pi))*np.exp(-1.*(tmp-self.dmu)/(2.*self.ds*self.ds))
             density /= sum(density)
 
             # EMNA update
