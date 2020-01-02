@@ -1711,13 +1711,6 @@ class IFabienosaur(Fabienosaur):
         # Archive
         self.archive_fitness: List[float] = []
 
-    def _internal_ask(self) -> base.ArrayLike:
-        mutated_sigma = self.sigma * np.exp(np.random.normal(0, 1) / np.sqrt(self.dimension))
-        individual = tuple(self.current_center + mutated_sigma * np.random.normal(0, 1, self.dimension))
-        self.unevaluated_population_sigma += [mutated_sigma]
-        self.unevaluated_population += [tuple(individual)]
-        return individual
-
     def _internal_tell(self, x: base.ArrayLike, value: float) -> None:
         self.archive_fitness += [value]
         if (not self.largeenough):
@@ -1766,10 +1759,13 @@ class IFabienosaur(Fabienosaur):
             # print(sys.stderr,"AAAAA ", self.secondToLastBest, ", ", self.previousBest, ", ", self.current_fitness, ", ", self.evaluated_population_fitness[0], ", ", self.current_center, ", ", self.evaluated_population[0])
             t1 = [(self.evaluated_population[i]-self.current_center)**2 for i in range(self.mu)]
             self.sigma = np.sqrt(sum(t1)/(self.mu))
-            imp = max(1, (np.log(self.llambda)/2)**(1/self.dimension))
-            if self.num_workers/self.dimension > 16:
+            # if self.num_workers/self.dimension > 16:
                 # if self.largeenough:
+            # if gofast:
+            if self.num_workers/self.dimension > 16:
+                imp = max(1, (np.log(self.llambda)/2)**(1/self.dimension))
                 self.sigma /= imp
+                # self.gofast = false
             self.evaluated_population = []
             self.evaluated_population_sigma = []
             self.evaluated_population_fitness = []
@@ -1780,7 +1776,7 @@ class EMNA(base.Optimizer):
 
     def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
         super().__init__(instrumentation, budget=budget, num_workers=num_workers)
-        self.sigma = 1
+        self.sigma = 1.0
         # self.sigma = np.ones(self.dimension)
         self.mu = self.dimension
         self.llambda = 4 * self.dimension
@@ -1852,7 +1848,7 @@ class IEMNA(base.Optimizer):
 
     def __init__(self, instrumentation: Union[int, Instrumentation], budget: Optional[int] = None, num_workers: int = 1) -> None:
         super().__init__(instrumentation, budget=budget, num_workers=num_workers)
-        self.sigma = 1
+        self.sigma = 1.0
         # self.sigma = np.ones(self.dimension)
         self.mu = self.dimension
         self.llambda = 4 * self.dimension
@@ -1908,7 +1904,7 @@ class IEMNA(base.Optimizer):
             
             # reweithing
             tmp = [np.asarray(self.evaluated_population[i]) for i in range(self.mu)]
-            density = 1./(self.ds*np.sqrt(2.*np.pi))*np.exp(-1.*(tmp-self.dmu)/(2.*self.ds*self.ds))
+            density = 1./(self.ds*np.sqrt(2.*np.pi))*np.exp(-0.5*((tmp-self.dmu)/self.ds)**2)
             density /= sum(density)
 
             # EMNA update
