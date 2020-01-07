@@ -144,8 +144,9 @@ def parallel(seed: Optional[int] = None) -> Iterator[Experiment]:
     # prepare list of parameters to sweep for independent variables
     seedg = create_seed_generator(seed)
     names = ["sphere", "rastrigin", "cigar"]
-    optims = ["ScrHammersleySearch", "FT_EMNA_NGO", "FT_IEMNA_NGO", "FT_Fabienosaur_NGO", "FT_IFabienosaur_NGO", "NGO", "CMA", "PSO", "NaiveTBPSA", "OnePlusOne", "DE", "TwoPointsDE"]
-    optims = ["NaiveTBPSA", "EMNA", "IEMNA", "Fabienosaur", "IFabienosaur", "DE"]
+    # optims = ["ScrHammersleySearch", "FT_EMNA_NGO", "FT_IEMNA_NGO", "FT_Fabienosaur_NGO", "FT_IFabienosaur_NGO", "NGO", "CMA", "PSO", "NaiveTBPSA", "OnePlusOne", "DE", "TwoPointsDE",
+    #              "EMNA", "IEMNA", "fab", "Fabienosaur", "IFabienosaur"]
+    optims = ["FT_Fabienosaur_NGO", "FT_EMNA_NGO", "FT_fab_NGO", "NGO"]
     functions = [
         ArtificialFunction(name, block_dimension=bd, useless_variables=bd * uv_factor)
         for name in names
@@ -214,7 +215,7 @@ def yabbob(seed: Optional[int] = None, parallel: bool = False, big: bool = False
               "TwoPointsDE", "OnePointDE", "AlmostRotationInvariantDE", "RotationInvariantDE"]
     if not parallel:
         optims += ["SQP", "Cobyla", "Powell", "chainCMASQP"]
-    optims = ["NaiveTBPSA", "EMNA", "IEMNA", "Fabienosaur", "IFabienosaur", "DE"]
+    optims = ["FT_Fabienosaur_NGO", "FT_EMNA_NGO", "FT_fab_NGO", "NGO"]
     #optims += [x for x, y in ng.optimizers.registry.items() if "chain" in x]
     names = ["hm", "rastrigin", "griewank", "rosenbrock", "ackley", "lunacek", "deceptivemultimodal", "bucherastrigin", "multipeak"]
     names += ["sphere", "doublelinearslope", "stepdoublelinearslope"]
