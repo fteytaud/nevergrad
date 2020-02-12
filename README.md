@@ -16,12 +16,16 @@ pip install git+https://github.com/facebookresearch/nevergrad@master#egg=nevergr
 
 Alternatively, you can clone the repository and run `pip install -e .` from inside the repository folder.
 
-By default, this only installs requirements for the optimization and instrumentation subpackages. If you are also interested in the benchmarking part,
-you should install with the `[benchmark]` flag (example: `pip install 'nevergrad[benchmark]'`), and if you also want the test tools, use
-the `[all]` flag (example: `pip install -e '.[all]'`)
+By default, this only installs requirements for the optimization and parametrization subpackages. If you are also interested in the benchmarking part,
+you should install with the `[benchmark]` flag (example: `pip install nevergrad[benchmark]`), and if you also want the test tools, use
+the `[all]` flag (example: `pip install -e .[all]`).
+
+**Notes**:
+- with `zhs` you will need to run `pip install 'nevergrad[all]'` instead of `pip install nevergrad[all]`
+- under Windows, you may need to preinstall torch (for `benchmark` or `all` installations) using instructions [here](https://pytorch.org/get-started/locally/).
 
 
-You can join Nevergrad users Facebook group [here](https://www.facebook.com/groups/nevergradusers/)
+You can join Nevergrad users Facebook group [here](https://www.facebook.com/groups/nevergradusers/).
 
 
 ## Goals and structure
@@ -48,7 +52,7 @@ The structure of the package follows its goal, you will therefore find subpackag
 
 The following README is very general, here are links to find more details on:
 - [how to perform optimization](docs/optimization.md) using `nevergrad`, including using parallelization and a few recommendation on which algorithm should be used depending on the settings
-- [how to parametrize](docs/parametrization.md) your problem so that the optimizers are informed of the problem to solve. This also provides a tool to instantiate a script or non-python code in order into a Python function and be able to tune some of its parameters.
+- [how to parametrize](docs/parametrization.md) your problem so that the optimizers are informed of the problem to solve. This also provides a tool to instantiate a script or non-python code into a Python function and be able to tune some of its parameters.
 - [how to benchmark](docs/benchmarking.md) all optimizers on various test functions.
 - [benchmark results](docs/benchmarks.md) of some standard optimizers an simple test cases.
 - examples of [optimization for machine learning](docs/machinelearning.md).
@@ -69,18 +73,17 @@ import nevergrad as ng
 def square(x):
     return sum((x - .5)**2)
 
-optimizer = ng.optimizers.OnePlusOne(instrumentation=2, budget=100)
+optimizer = ng.optimizers.OnePlusOne(parametrization=2, budget=100)
 recommendation = optimizer.minimize(square)
 print(recommendation)  # optimal args and kwargs
->>> Candidate(args=(array([0.500, 0.499]),), kwargs={})
+>>> Array{(2,)}[recombination=average,sigma=1.0]:[0.49971112 0.5002944 ]
 ```
 
-`recommendation` holds the optimal attributes `args` and `kwargs` found by the optimizer for the provided function.
-In this example, the optimal value will be found in `recommendation.args[0]` and will be a `np.ndarray` of size 2.
+`parametrization=n` is a shortcut to state that the function has only one variable, of dimension `n`,
+See the [parametrization tutorial](docs/parametrization.md) for more complex parametrizations.
 
-`instrumentation=n` is a shortcut to state that the function has only one variable, of dimension `n`,
-See the [instrumentation tutorial](docs/instrumentation.md) for more complex instrumentations.
-
+`recommendation` holds the optimal value(s) found by the for the provided function. It can be
+directly accessed through `recommendation.value` which is here a `np.ndarray` of size 2.
 
 You can print the full list of optimizers with:
 ```python
