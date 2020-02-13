@@ -1661,6 +1661,9 @@ class EMNA(base.Optimizer):
                 self.sigma /= imp
             self._evaluated_population = []
 
+    def _internal_tell_not_asked(self, candidate: p.Parameter, value: float) -> None:
+        base.TellNotAskedNotSupportedError
+
 
 @registry.register
 class EMNA_TBPSA(TBPSA):
