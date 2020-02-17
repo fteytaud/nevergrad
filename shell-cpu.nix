@@ -43,8 +43,10 @@ with import <nixpkgs> {};
           self.cma
           self.gym 
           self.matplotlib
+          self.numba
           self.pandas
           self.pytorch
+          self.pytest
           self.typing-extensions
         ];
       };
