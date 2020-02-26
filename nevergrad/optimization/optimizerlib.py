@@ -1593,7 +1593,6 @@ class EMNA(base.Optimizer):
 
     def _internal_provide_recommendation(self) -> ArrayLike:
         return self.current_center
-        #return self.current_bests["optimistic"].x  # Naive version
 
     def _internal_ask_candidate(self) -> p.Parameter:
         individual = self.current_center + self.sigma * self._rng.normal(0, 1, self.dimension)
