@@ -1434,7 +1434,7 @@ class EMNA(base.Optimizer):
 
     def __init__(self, parametrization: IntOrParameter, budget: Optional[int] = None, num_workers: int = 1) -> None:
         super().__init__(parametrization, budget=budget, num_workers=num_workers)
-        self.sigma = 1.0
+        self.sigma: tp.Union[float, np.ndarray] = 1.0
         self.mu = self.dimension
         self.llambda = 4 * self.dimension
         if num_workers is not None:
@@ -1545,6 +1545,106 @@ class NaiveAnisoEMNA(AnisoEMNA):
 
     def _internal_provide_recommendation(self) -> ArrayLike:
         return self.current_bests["optimistic"].x  # Naive version
+
+
+@registry.register
+class EmnaTBPSA(TBPSA):
+    """Test-based population-size adaptation with emna rule for updating sigma
+    Population-size equal to lambda = 4 x dimension.
+    Test by comparing the first fifth and the last fifth of the 5lambda evaluations.
+    """
+
+    # pylint: disable=too-many-instance-attributes
+
+    def _internal_ask_candidate(self) -> p.Parameter:
+        individual = self.current_center + self.sigma * self._rng.normal(0, 1, self.dimension)
+        #mutated_sigma = self.sigma * np.exp(self._rng.normal(0, 1) / np.sqrt(self.dimension))
+        #individual = self.current_center + mutated_sigma * self._rng.normal(0, 1, self.dimension)
+        parent = self.parents[self.num_ask % len(self.parents)]
+        candidate = parent.spawn_child().set_standardized_data(individual, reference=self.parametrization)
+        if parent is self.parametrization:
+            candidate.heritage["lineage"] = candidate.uid  # for tracking
+        #candidate._meta["sigma"] = mutated_sigma
+        candidate._meta["sigma"] = self.sigma
+        return candidate
+
+    def _internal_tell_candidate(self, candidate: p.Parameter, value: float) -> None:
+        candidate._meta["loss"] = value
+        self.popsize.add_value(value)
+        self.children.append(candidate)
+        if len(self.children) >= self.popsize.llambda:
+            # Sorting the population.
+            self.children.sort(key=lambda c: c._meta["loss"])
+            # Computing the new parent.
+            self.parents = self.children[: self.popsize.mu]
+            self.children = []
+            self.current_center = sum(c.get_standardized_data(reference=self.parametrization)  # type: ignore
+                                      for c in self.parents) / self.popsize.mu
+            # EMNA update
+            stdd = [(self.parents[i].get_standardized_data(reference=self.parametrization) - self.current_center)**2 for i in range(self.popsize.mu)]
+            self.sigma = np.sqrt(np.sum(stdd) / (self.popsize.mu * self.dimension))
+            if self.num_workers / self.dimension > 16: # faster decrease of sigma if large parallel context
+                imp = max(1, (np.log(self.popsize.llambda) / 2)**(1 / self.dimension))
+                self.sigma /= imp
+            #self.sigma = np.exp(np.sum(np.log([c._meta["sigma"] for c in self.parents])) / self.popsize.mu)
+
+
+@registry.register
+class NaiveEmnaTBPSA(EmnaTBPSA):
+    def _internal_provide_recommendation(self) -> ArrayLike:
+        return self.current_bests["optimistic"].x
+
+
+@registry.register
+class Test(TBPSA):
+    """Test-based population-size adaptation with emna rule for updating sigma
+    Population-size equal to lambda = 4 x dimension.
+    Test by comparing the first fifth and the last fifth of the 5lambda evaluations.
+    """
+
+    # pylint: disable=too-many-instance-attributes
+
+    def _internal_ask_candidate(self) -> p.Parameter:
+        if self.num_workers / self.dimension < 6:
+            mutated_sigma = self.sigma * np.exp(self._rng.normal(0, 1) / np.sqrt(self.dimension))
+            individual = self.current_center + mutated_sigma * self._rng.normal(0, 1, self.dimension)
+        else:
+            individual = self.current_center + self.sigma * self._rng.normal(0, 1, self.dimension)
+        parent = self.parents[self.num_ask % len(self.parents)]
+        candidate = parent.spawn_child().set_standardized_data(individual, reference=self.parametrization)
+        if parent is self.parametrization:
+            candidate.heritage["lineage"] = candidate.uid  # for tracking
+        #candidate._meta["sigma"] = mutated_sigma
+        candidate._meta["sigma"] = self.sigma
+        return candidate
+
+    def _internal_tell_candidate(self, candidate: p.Parameter, value: float) -> None:
+        candidate._meta["loss"] = value
+        self.popsize.add_value(value)
+        self.children.append(candidate)
+        if len(self.children) >= self.popsize.llambda:
+            # Sorting the population.
+            self.children.sort(key=lambda c: c._meta["loss"])
+            # Computing the new parent.
+            self.parents = self.children[: self.popsize.mu]
+            self.children = []
+            self.current_center = sum(c.get_standardized_data(reference=self.parametrization)  # type: ignore
+                                      for c in self.parents) / self.popsize.mu
+            if self.num_workers / self.dimension < 6:
+                self.sigma = np.exp(np.sum(np.log([c._meta["sigma"] for c in self.parents])) / self.popsize.mu)
+            else:
+                # EMNA update
+                stdd = [(self.parents[i].get_standardized_data(reference=self.parametrization) - self.current_center)**2 for i in range(self.popsize.mu)]
+                self.sigma = np.sqrt(np.sum(stdd) / (self.popsize.mu * self.dimension))
+                if self.num_workers / self.dimension > 16: # faster decrease of sigma if large parallel context
+                    imp = max(1, (np.log(self.popsize.llambda) / 2)**(1 / self.dimension))
+                    self.sigma /= imp
+
+
+@registry.register
+class NaiveTest(Test):
+    def _internal_provide_recommendation(self) -> ArrayLike:
+        return self.current_bests["optimistic"].x
 
 
 @registry.register
