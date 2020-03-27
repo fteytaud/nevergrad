@@ -227,7 +227,10 @@ class Parameter:
         self.set_name(name)  # with_name allows chaining
 
     def __repr__(self) -> str:
-        return f"{self.name}:{self.value}"
+        strings = [self.name]
+        if not callable(self.value):  # not a mutation
+            strings.append(str(self.value))
+        return ":".join(strings)
 
     def set_name(self: P, name: str) -> P:
         """Sets a name and return the current instrumentation (for chaining)
@@ -350,6 +353,7 @@ class Parameter:
         This is used to run multiple experiments
         """
         child = self.spawn_child()
+        child._name = self._name
         child.random_state = None
         return child
 
