@@ -818,7 +818,7 @@ def photonics(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
 def bragg_structure(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
     seedg = create_seed_generator(seed)
     recombinable: tp.List[tp.Union[str, ConfiguredOptimizer]] = [
-        ng.families.EvolutionStrategy(recombination_ratio=0.1, popsize=40).set_name("DES"),
+        ng.families.EvolutionStrategy(recombination_ratio=0.1, popsize=40).set_name("Pairwise-ES"),
         ng.families.DifferentialEvolution(crossover="parametrization").set_name("Param-DE")
     ]
     algos: tp.List[tp.Union[str, ConfiguredOptimizer]] = ["TwoPointsDE", "DE", "CMA", "NaiveTBPSA", "DiagonalCMA"]
@@ -833,7 +833,7 @@ def bragg_structure(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
     param = func_mix.parametrization
     param.set_name("mix")
     param.set_recombination(ng.p.Choice([ng.p.mutation.Crossover(axis=1), ng.p.mutation.RavelCrossover()]))  # type: ignore
-    muts = ["gaussian", "cauchy", ng.p.mutation.Jumping(axis=1), ng.p.mutation.Translation(axis=1)]
+    muts = ["gaussian", "cauchy", ng.p.mutation.Jumping(axis=1, size=5), ng.p.mutation.Translation(axis=1)]
     muts += [ng.p.mutation.LocalGaussian(axes=1, size=10)]
     param.set_mutation(custom=ng.p.Choice(muts))  # type: ignore
     for budget in [1e3, 1e4, 1e5, 1e6]:
