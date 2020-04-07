@@ -86,6 +86,7 @@ WidePSO = ConfiguredPSO(transform="arctan", wide=True).set_name(
 
 # EMNA
 IsoEMNA = EMNA(naive=False).set_name("IsoEMNA", register=True)
+OneShotEMNA = EMNA(naive=False, oneshot=True).set_name("OneShotEMNA", register=True)
 NaiveAnisoEMNA = EMNA(isotropic=False).set_name("NaiveAnisoEMNA", register=True)
 AnisoEMNA = EMNA(naive=False, isotropic=False).set_name("AnisoEMNA", register=True)
 IsoEMNATBPSA = EMNA(naive=False, population_size_adaptation=True).set_name("IsoEMNATBPSA", register=True)

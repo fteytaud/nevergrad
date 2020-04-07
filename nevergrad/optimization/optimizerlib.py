@@ -1532,12 +1532,14 @@ class _EMNA(base.Optimizer):
             num_workers: int = 1,
             isotropic: bool = True,
             naive: bool = True,
-            population_size_adaptation: bool = False
+            population_size_adaptation: bool = False,
+            oneshot: bool = False
     ) -> None:
         super().__init__(parametrization, budget=budget, num_workers=num_workers)
         self.isotropic: bool = isotropic
         self.naive: bool = naive
         self.population_size_adaptation = population_size_adaptation
+        self.oneshot = oneshot
         self.min_coef_parallel_context: int = 8
         # Sigma initialization
         self.sigma: tp.Union[float, np.ndarray]
@@ -1607,9 +1609,13 @@ class _EMNA(base.Optimizer):
                 self.sigma = np.sqrt(np.sum(stdd, axis=0 if self.isotropic else None) /
                                      (self.popsize.mu * (self.dimension if self.isotropic else 1)))
 
-            if self.num_workers / self.dimension > 32:  # faster decrease of sigma if large parallel context
+            if self.num_workers / self.dimension > 32 and not self.oneshot:  # faster decrease of sigma if large parallel context
                 imp = max(1, (np.log(self.popsize.llambda) / 2)**(1 / self.dimension))
                 self.sigma /= imp
+
+            if self.oneshot:
+                self.sigma *= np.sqrt(np.log(self.popsize.llambda)/self.dimension)
+
 
     def _internal_tell_not_asked(self, candidate: p.Parameter, value: float) -> None:
         raise base.TellNotAskedNotSupportedError
