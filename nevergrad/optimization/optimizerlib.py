@@ -1643,7 +1643,8 @@ class EMNA(base.ConfiguredOptimizer):
         *,
         isotropic: bool = True,
         naive: bool = True,
-        population_size_adaptation: bool = False
+        population_size_adaptation: bool = False,
+        oneshot: bool = False
     ) -> None:
         super().__init__(_EMNA, locals())
 
