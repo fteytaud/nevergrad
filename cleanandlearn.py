@@ -14,11 +14,23 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
+import sys
+import getopt
 
 min_max_scaler = preprocessing.MinMaxScaler()
 
 
 def keepBest(data):
+    data = data[['dimension','budget', 'loss','optimizer_name']]
+    new = data["optimizer_name"].str.split("_", n = 2, expand = True)
+    data["mu"] = new[1] 
+    data["lambda"] = new[2] 
+    data["mu"] = data["mu"].astype('int64')
+    data["lambda"] = data["lambda"].astype('int64')
+    data.drop(columns =["optimizer_name"], inplace = True) 
+
+    print(data.head())
+    print(data.dtypes)
     alldata = np.unique(data[['dimension', 'budget', 'lambda']], axis=0)
     print(alldata.shape)
     cleaned_data = pd.DataFrame(columns=['dimension', 'budget', 'lambda', 'mu'])
@@ -82,42 +94,71 @@ class Model(nn.Module):
         super().__init__()
         self.inputSize = 3
         self.outputSize = 1
-        self.hiddenSize1 = 30
-        self.hiddenSize2 = 80
-        self.hiddenSize3 = 20
-        self.hiddenSize4 = 5
+        # self.hiddenSize1 = 30
+        # self.hiddenSize2 = 80
+        # self.hiddenSize3 = 20
+        # self.hiddenSize4 = 5
         
+        # self.classifier = nn.Sequential(
+        #     nn.Linear(self.inputSize, self.hiddenSize1),
+        #     # nn.BatchNorm1d(self.hiddenSize1),
+        #     nn.Dropout(0.3),
+        #     nn.ReLU(),
+        #     nn.Linear(self.hiddenSize1, self.hiddenSize2),
+        #     # nn.BatchNorm1d(self.hiddenSize2),
+        #     nn.Dropout(0.3),
+        #     nn.ReLU(),
+        #     nn.Linear(self.hiddenSize2, self.hiddenSize3),
+        #     nn.Dropout(0.3),
+        #     nn.ReLU(),
+        #     nn.Linear(self.hiddenSize3, self.hiddenSize4),
+        #     nn.Dropout(0.3),
+        #     nn.ReLU(),
+        #     nn.Linear(self.hiddenSize4, self.outputSize)
+        # )
+        
+        self.hiddenSize1 = 10
+        self.hiddenSize2 = 10
         self.classifier = nn.Sequential(
             nn.Linear(self.inputSize, self.hiddenSize1),
             # nn.BatchNorm1d(self.hiddenSize1),
             nn.Dropout(0.3),
             nn.ReLU(),
             nn.Linear(self.hiddenSize1, self.hiddenSize2),
-            # nn.BatchNorm1d(self.hiddenSize2),
+            # nn.BatchNorm1d(self.hiddenSize1),
             nn.Dropout(0.3),
             nn.ReLU(),
-            nn.Linear(self.hiddenSize2, self.hiddenSize3),
-            nn.Dropout(0.3),
-            nn.ReLU(),
-            nn.Linear(self.hiddenSize3, self.hiddenSize4),
-            nn.Dropout(0.3),
-            nn.ReLU(),
-            nn.Linear(self.hiddenSize4, self.outputSize)
+            nn.Linear(self.hiddenSize2, self.outputSize)
         )
-        
+
     def forward(self, x):
         x = self.classifier(x)
         return x
-               
 
-def main():
-    data = pd.read_csv('data.csv', sep=',')
+def usage():
+    print("Usage: ./cleanandlearn --filename=data_file_name.csv")
+
+def main(argv):
+    filename=''
+    try:                                
+        opts, args = getopt.getopt(argv, "n", ["filename="])
+    except getopt.GetoptError:
+        usage()
+        sys.exit(2)
+    if (len(opts) == 0):
+        usage()
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ('-n', '--filename'):
+            filename = arg
+
+
+    data = pd.read_csv(filename, sep=',')
     cleaned_data = keepBest(data)
     # analyze(cleaned_data)
     x_train, y_train, x_test, y_test = splitData(cleaned_data, 0.2)
     print(x_train.shape)
     print(x_test.shape)
-    return
     model = Model()
     loss_function = nn.MSELoss()
     optimizer = optim.Adam(model.parameters())
@@ -170,4 +211,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
