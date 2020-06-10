@@ -196,13 +196,13 @@ class _simpleSA(base.Optimizer):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(
-            self,
-            parametrization: IntOrParameter,
-            budget: Optional[int] = None,
-            num_workers: int = 1,
-            mu: int = 2,
-            llambda: int = 8,
-            naive: bool = True,
+        self,
+        parametrization: IntOrParameter,
+        budget: Optional[int] = None,
+        num_workers: int = 1,
+        mu: int = 2,
+        llambda: int = 8,
+        naive: bool = True,
     ) -> None:
         super().__init__(parametrization, budget=budget, num_workers=num_workers)
         self.mu = mu

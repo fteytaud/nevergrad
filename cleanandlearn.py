@@ -9,6 +9,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.utils.data as Data
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import imageio
 from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
@@ -57,6 +58,21 @@ def analyze(data):
     print(data.info())
     print(data.describe())
     print(data.head())
+    data.to_csv('prout.csv')
+    # data.plot.scatter(x='mu', y='lambda');
+    # plt.show()
+
+    xx = 'mu'
+    yy = 'lambda'
+    zz = 'dimension'
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111, projection='3d')
+    ax1.scatter(data[xx], data[yy], data[zz])
+    ax1.set_xlabel(xx)
+    ax1.set_ylabel(yy)
+    ax1.set_zlabel(zz)
+    plt.show()
 
 
 def splitData(data, test_ratio):
@@ -155,7 +171,8 @@ def main(argv):
 
     data = pd.read_csv(filename, sep=',')
     cleaned_data = keepBest(data)
-    # analyze(cleaned_data)
+    analyze(cleaned_data)
+    return
     x_train, y_train, x_test, y_test = splitData(cleaned_data, 0.2)
     print(x_train.shape)
     print(x_test.shape)
