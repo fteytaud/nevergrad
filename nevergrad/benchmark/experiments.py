@@ -164,12 +164,12 @@ def my_bench(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
     functions = [
         ArtificialFunction(name, block_dimension=bd, useless_variables=bd * uv_factor)
         for name in names
-        for bd in [2, 4, 8, 16, 32]
+        for bd in [2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 28, 32]
         for uv_factor in [0]
     ]
     for func in functions:
         for optim in optims:
-            for budget in [30, 100, 300, 900, 3000]:
+            for budget in [30, 50, 100, 300, 600, 900, 1500, 2000, 2500, 3000]:
                 yield Experiment(func, optim, budget=budget, num_workers=1, seed=next(seedg))
 
 
