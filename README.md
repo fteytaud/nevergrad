@@ -54,4 +54,5 @@ Check out our [**documentation**](https://facebookresearch.github.io/nevergrad/)
 
 ## License
 
-`nevergrad` is released under the MIT license. See [LICENSE](LICENSE) for additional details about it.
+1nevergrad` is released under the MIT license. See [LICENSE](LICENSE) for additional details about it.
+
